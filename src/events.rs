@@ -7,8 +7,8 @@ use listener::tcp_listener;
 // PlaySong(Box<Vec<String>>),
 pub enum Event {
     PlaySong(String),
-    Tick,
     Stop,
+    Pause,
 }
 
 pub struct Events {
@@ -39,6 +39,7 @@ impl Events {
     pub fn next(&self) -> Result<Event, Box<dyn Error>> {
         match self.receiver.recv() {
             Ok(val) => Ok(val),
+            // TODO: graceful shutdown here i think
             // this is bad and i feel bad
             Err(e) => Err(Box::from(format!("{}", e))),
         }

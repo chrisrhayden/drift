@@ -44,10 +44,10 @@ impl Daemon {
         loop {
             match events.next()? {
                 Event::PlaySong(val) => {
-                    println!("{}", val);
-                    // self.play_song(val)?;
-                },
-                _ => break,
+                    self.play_song(&val)?;
+                }
+                Event::Stop => break,
+                Event::Pause => self.pause_song(),
             }
         }
 
@@ -60,5 +60,11 @@ impl Daemon {
         self.song.set_song_sink(song_sink);
 
         Ok(())
+    }
+
+    fn pause_song(&mut self) {
+        if let Some(song_sink) = self.song.song_sink {
+
+        }
     }
 }
