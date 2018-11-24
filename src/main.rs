@@ -4,6 +4,7 @@ extern crate regex;
 mod daemon;
 mod events;
 mod listener;
+mod song;
 
 use daemon::Daemon;
 
