@@ -49,7 +49,9 @@ impl Daemon {
                     stream.write(b"HTTP/1.1 200 killing server\r\n\r\n")?;
                     break;
                 }
-                _ => break,
+                Event::ThreadError(err) => {
+                    return Err(Box::from(err));
+                }
             };
         }
 
