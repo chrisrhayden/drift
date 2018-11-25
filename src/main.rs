@@ -5,6 +5,7 @@ mod daemon;
 mod events;
 mod listener;
 mod song;
+mod queue;
 
 use daemon::Daemon;
 

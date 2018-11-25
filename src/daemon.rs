@@ -2,8 +2,12 @@ use std::error::Error;
 use std::io::Write;
 use std::net::TcpStream;
 
+use std::path::PathBuf;
+
 use events::{Event, Events};
 use song::Song;
+
+use queue::Queue;
 
 pub struct Daemon {
     song: Song,
@@ -17,6 +21,8 @@ impl Daemon {
     pub fn run(&mut self) -> Result<bool, Box<dyn Error>> {
         let events = Events::new()?;
 
+        let mut queue = Queue::new();
+
         loop {
             let evt = events.next()?;
             let mut stream: TcpStream = match evt.1 {
@@ -26,6 +32,8 @@ impl Daemon {
 
             match evt.0 {
                 Event::PlaySong(val) => {
+                    queue.add_song_start_queue(PathBuf::from(&val))?;
+
                     self.song.play_song(&val)?;
                     stream.write(b"HTTP/1.1 200 playing song\r\n\r\n")?;
                 }
