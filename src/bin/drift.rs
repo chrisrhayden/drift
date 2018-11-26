@@ -1,13 +1,6 @@
-extern crate rodio;
-extern crate regex;
+extern crate drift;
 
-mod daemon;
-mod events;
-mod listener;
-mod song;
-mod queue;
-
-use daemon::Daemon;
+use drift::daemon::Daemon;
 
 fn main() {
     let mut da: Daemon = Daemon::new();

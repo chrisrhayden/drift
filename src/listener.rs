@@ -1,62 +1,47 @@
+use std::fs;
+use std::path::Path;
 use std::error::Error;
 use std::io::prelude::*;
-use std::io::Write;
-use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc::Sender;
-
-use regex::Regex;
+use std::os::unix::net::UnixListener;
 
 use events::{evt_dispatch, Event};
 
-pub fn tcp_listener(
-    sender: Sender<(Event, Option<TcpStream>)>,
-    tcp_handler: TcpListener,
-) -> Result<(), Box<dyn Error>> {
-    let request_regex: Regex = Regex::new(r".+\r\n\r\n(.+)")?;
+pub fn socket_listener(sender: Sender<Event>) -> Result<(), Box<dyn Error>> {
+    let socket_path = Path::new("/tmp/drift_socket");
 
-    for stream in tcp_handler.incoming() {
-        let mut stream_buff = [0; 512];
-
-        let mut stream = stream?;
-
-        stream.read(&mut stream_buff)?;
-
-        let stream_string = String::from_utf8_lossy(&stream_buff);
-
-        let body = match parse_request(&request_regex, &*stream_string)? {
-            Some(val) => val,
-            None => {
-                stream.write(b"http/1.1 400 bad data\r\n\r\n")?;
-                continue;
+    if socket_path.exists() {
+        match socket_path.to_str() {
+            Some(val) => {
+                fs::remove_file(&socket_path)
+                    .expect(&format!("couldn't delete file: {}", val));
             }
+            None => {}
         };
-
-        let evt = evt_dispatch(&body);
-
-        sender.send((evt, Some(stream)))?;
     }
 
-    Ok(())
-}
-
-// TODO: consider getting a library to parse the http response
-fn parse_request(
-    request_regex: &Regex,
-    stream_string: &str,
-) -> Result<Option<String>, Box<dyn Error>> {
-    let capture_str = request_regex.captures(&stream_string).unwrap().get(1);
-
-    let stream_msg = match capture_str {
-        Some(message) => message
-            .as_str()
-            .trim_start()
-            .trim_right_matches(char::from(0)),
-        None => return Ok(None),
+    let stream = match UnixListener::bind(&socket_path) {
+        Ok(stream) => stream,
+        Err(_) => panic!("failed to bind socket"),
     };
 
-    if stream_msg.is_empty() {
-        return Ok(None);
+    for client in stream.incoming() {
+        let mut client = client.unwrap();
+
+        let mut buf_str = String::new();
+
+        client
+            .read_to_string(&mut buf_str)
+            .expect("couldn't red to string");
+
+        let new_buf = buf_str.trim_start().trim_end();
+
+        let evt = evt_dispatch(&new_buf);
+
+        sender.send(evt).expect("couldn't send event");
     }
 
-    Ok(Some(String::from(stream_msg)))
+    sender.send(Event::None).expect("failed to send event");
+
+    Ok(())
 }

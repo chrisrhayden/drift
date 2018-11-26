@@ -1,11 +1,10 @@
-use std::error::Error;
-use std::sync::mpsc;
 use std::thread;
+use std::sync::mpsc;
+use std::error::Error;
 
-use std::net::{TcpListener, TcpStream};
+use listener::socket_listener;
 
-use listener::tcp_listener;
-
+#[derive(Debug)]
 pub enum Event {
     PlaySong(String),
     Stop,
@@ -17,7 +16,7 @@ pub enum Event {
 }
 
 pub struct Events {
-    receiver: mpsc::Receiver<(Event, Option<TcpStream>)>,
+    receiver: mpsc::Receiver<Event>,
 }
 
 impl Events {
@@ -28,16 +27,14 @@ impl Events {
     pub fn make_event_threads() -> Result<Self, Box<dyn Error>> {
         let (tx, rx) = mpsc::channel();
 
-        let tcp_handler = TcpListener::bind("127.0.3.3:3333").unwrap();
-
         {
             thread::spawn(move || {
                 // this is trash
                 let tx1 = tx.clone();
-                if let Err(e) = tcp_listener(tx1, tcp_handler) {
+                if let Err(e) = socket_listener(tx1) {
                     let err_str: String = format!("{}", e).clone();
 
-                    match tx.send((Event::ThreadError(err_str), None)) {
+                    match tx.send(Event::ThreadError(err_str)) {
                         Ok(_) => {}
                         // just print an error if we run in to one sending
                         Err(err) => eprintln!("{}", err),
@@ -49,7 +46,7 @@ impl Events {
         Ok(Events { receiver: rx })
     }
 
-    pub fn next(&self) -> Result<(Event, Option<TcpStream>), Box<dyn Error>> {
+    pub fn next(&self) -> Result<Event, Box<dyn Error>> {
         match self.receiver.recv() {
             Ok(val) => Ok(val),
             // this is bad and i feel bad

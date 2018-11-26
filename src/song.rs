@@ -12,7 +12,8 @@ impl Song {
     pub fn new() -> Self {
         Song {
             song_sink: None,
-            device: rodio::default_output_device().unwrap(),
+            device: rodio::default_output_device()
+                .expect("couldn't get device"),
         }
     }
 
