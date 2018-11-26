@@ -6,3 +6,4 @@ authors = ["chris <chrisrhayden@gmail.com>"]
 [dependencies]
 rodio = "0.8.1"
 regex = "1"
+clap = "2.32.0"

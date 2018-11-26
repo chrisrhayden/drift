@@ -5,3 +5,4 @@ pub mod daemon;
 pub mod listener;
 pub mod events;
 pub mod song;
+pub mod client;
