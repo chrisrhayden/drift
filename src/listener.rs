@@ -7,16 +7,12 @@ use std::os::unix::net::UnixListener;
 
 use events::{evt_dispatch, Event};
 
-pub fn socket_listener(sender: Sender<Event>) -> Result<(), Box<dyn Error>> {
+pub fn socket_listener(sender: &Sender<Event>) -> Result<(), Box<dyn Error>> {
     let socket_path = Path::new("/tmp/drift_socket");
 
     if socket_path.exists() {
-        match socket_path.to_str() {
-            Some(val) => {
-                fs::remove_file(&socket_path)
-                    .expect(&format!("couldn't delete file: {}", val));
-            }
-            None => {}
+        if let Some(socket_path) = socket_path.to_str() {
+            fs::remove_file(&socket_path).unwrap();
         };
     }
 

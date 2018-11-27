@@ -1,10 +1,9 @@
-use std::env::current_dir;
 use std::error::Error;
 use std::path::PathBuf;
 
 pub struct Queue {
-    current_song: Option<PathBuf>,
-    queue: Vec<PathBuf>,
+    pub current_song: Option<PathBuf>,
+    pub queue: Vec<PathBuf>,
 }
 
 impl Queue {
@@ -19,46 +18,30 @@ impl Queue {
         self.current_song = Some(current_song);
     }
 
-    pub fn get_next_songs(&self) -> Result<(), Box<dyn Error>> {
-        let current_song = match &self.current_song {
-            Some(val) => val,
-            None => return Ok(()),
-        };
-
-        let base_path: PathBuf = match current_song.parent() {
-            Some(val) => val.to_owned(),
-            None => return Err(Box::from("no parent dir")),
-        };
-
-        for dir in base_path.read_dir() {
-            println!("found file: {:?}", dir);
-        }
-
-        Ok(())
-    }
-
-    pub fn add_song_start_queue(
+    pub fn add_to_queue(
         &mut self,
-        song: PathBuf,
-    ) -> Result<(), Box<dyn Error>> {
-        self.add_current_song(song);
-        self.get_next_songs()?;
+        queue_str: String,
+    ) -> Result<PathBuf, Box<dyn Error>> {
+        let to_convert = queue_str.split("\r\n\r\n").collect::<Vec<_>>();
 
-        Ok(())
+        let mut queue_vec: Vec<PathBuf> =
+            to_convert.iter().map(|val| PathBuf::from(val)).collect();
+
+        let current_song: PathBuf = queue_vec.pop().unwrap();
+
+        self.queue.append(&mut queue_vec);
+
+        Ok(current_song)
     }
-}
 
-fn main() {
-    if let Err(err) = run() {
-        eprintln!("{}", err);
+    pub fn get_next_song(&mut self) -> Option<PathBuf> {
+        let next_song = match self.queue.pop() {
+            Some(song) => Some(song),
+            None => return None,
+        };
+
+        self.current_song = next_song.clone();
+
+        next_song
     }
-}
-
-fn run() -> Result<(), Box<dyn Error>> {
-    let cur_dir = current_dir()?;
-    let q = Queue::new();
-
-    q.get_next_songs()?;
-
-    Ok(())
 }

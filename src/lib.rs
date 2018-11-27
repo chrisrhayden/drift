@@ -6,3 +6,4 @@ pub mod listener;
 pub mod events;
 pub mod song;
 pub mod client;
+pub mod queue;
