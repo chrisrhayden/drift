@@ -1,90 +1,113 @@
-use std::thread;
 use std::sync::mpsc;
-use std::error::Error;
-use std::time::Duration;
+use std::thread;
+use std::os::unix::net::UnixListener;
+use std::fs;
 
-use listener::socket_listener;
+use std::io::Read;
+
+use app::App;
 
 #[derive(Debug)]
 pub enum Event {
-    Stop,
     Pause,
-    PauseToggle,
     Kill,
     None,
-    Update,
-    Show,
-    Info(String),
-    PlaySong(String),
-    AddQueue(String),
-    ThreadError(String),
+    Stop,
+    TogglePause,
+    Play(String),
 }
 
+
+// TODO: remove this
+#[allow(dead_code)]
 pub struct Events {
-    pub receiver: mpsc::Receiver<Event>,
-    pub sender: mpsc::Sender<Event>,
-    pub update_trhead: thread::JoinHandle<Event>,
-    pub socket_thread: thread::JoinHandle<()>,
+    receiver: mpsc::Receiver<Event>,
+    sender: mpsc::Sender<Event>,
+    unix_stream: UnixListener,
 }
 
 impl Events {
-    pub fn new() -> Result<Self, Box<dyn Error>> {
-        Events::make_event_threads()
+    pub fn new(app: &App) -> Self {
+        let (sender, receiver, unix_stream) =
+            Events::make_listener_thread(&app);
+
+        Events {
+            receiver,
+            sender,
+            unix_stream,
+        }
     }
 
-    pub fn make_event_threads() -> Result<Self, Box<dyn Error>> {
+    fn make_listener_thread(
+        app: &App,
+    ) -> (mpsc::Sender<Event>, mpsc::Receiver<Event>, UnixListener) {
+        let socket_path = app.socket_path.to_owned();
+
         let (tx, rx) = mpsc::channel();
 
-        let tx1 = tx.clone();
-        let socket_thread = thread::spawn(move || {
-            if let Err(e) = socket_listener(&tx1) {
-                let err_str: String = format!("{}", e).clone();
+        if socket_path.exists() {
+            fs::remove_file(&socket_path).unwrap();
+        }
 
-                match tx1.send(Event::ThreadError(err_str)) {
-                    Ok(_) => {}
-                    // just print an error if we run in to one sending
-                    Err(err) => eprintln!("{}", err),
-                }
+        // get a handle of a socket
+        let stream = match UnixListener::bind(&socket_path) {
+            Ok(stream) => stream,
+            Err(_) => {
+                let path = socket_path.to_string_lossy();
+                panic!("couldn't connect to socket_path {}", path);
             }
+        };
+
+        // make a clone to send to the thread
+        let stream1 = match stream.try_clone() {
+            Err(_) => panic!("couldn't clone stream"),
+            Ok(stream) => stream,
+        };
+
+        let tx1 = tx.clone();
+
+        thread::spawn(move || {
+            for client in stream1.incoming() {
+                let mut client = client.unwrap();
+
+                let mut buf_string = String::new();
+
+                client
+                    .read_to_string(&mut buf_string)
+                    .expect("received string with invalid utf8 characters");
+
+                let buf_string = buf_string.trim_start().trim_end();
+
+                let evt = event_dispatch(&buf_string);
+
+                tx1.send(evt).expect("couldn't send event");
+            }
+
+            tx1.send(Event::Kill).unwrap();
         });
 
-        let tx2 = tx.clone();
-        let update_trhead = thread::spawn(move || loop {
-            tx2.send(Event::Update).unwrap();
-            thread::sleep(Duration::from_millis(500));
-        });
-
-        Ok(Events { receiver: rx, sender: tx, update_trhead, socket_thread })
+        (tx, rx, stream)
     }
 
-    pub fn next(&self) -> Result<Event, Box<dyn Error>> {
-        match self.receiver.recv() {
-            Ok(val) => Ok(val),
-            // this is bad and i feel bad
-            Err(e) => Err(Box::from(format!("{}", e))),
-        }
+    pub fn next(&self) -> Result<Event, mpsc::RecvError> {
+        self.receiver.recv()
     }
 }
 
-pub fn evt_dispatch(evt_str: &str) -> Event {
-    if evt_str.starts_with("play") {
-        // slice off first 5 characters, trim characters from end of line
-        let to_send: String = evt_str[5..].trim_start().trim_end().to_string();
-        return Event::PlaySong(to_send);
-    } else if evt_str.starts_with("add_queue") {
-        let to_send = evt_str[10..].trim_start().trim_end().to_string();
-        return Event::AddQueue(to_send);
-    } else if evt_str == "pause" {
-        return Event::Pause;
-    } else if evt_str == "stop" {
-        return Event::Stop;
+fn event_dispatch(evt_str: &str) -> Event {
+    if evt_str == "pause" {
+        Event::Pause
     } else if evt_str == "toggle" {
-        return Event::PauseToggle;
+        Event::TogglePause
+    } else if evt_str == "stop" {
+        Event::Stop
     } else if evt_str == "kill" {
-        return Event::Kill;
-    } else if evt_str == "show" {
-        return Event::Show;
+        Event::Kill
+    } else if evt_str.starts_with("play") {
+        // cut off play and the space, strip newlines and other fluff
+        let to_send: String = evt_str[5..].trim_start().trim_end().to_string();
+        Event::Play(to_send)
     } else {
-        return Event::None;
+        Event::None
     }
 }
