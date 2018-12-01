@@ -9,14 +9,13 @@ use app::App;
 
 #[derive(Debug)]
 pub enum Event {
-    Pause,
     Kill,
     None,
     Stop,
+    Pause,
     TogglePause,
     Play(String),
 }
-
 
 // TODO: remove this
 #[allow(dead_code)]

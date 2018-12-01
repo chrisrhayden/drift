@@ -15,12 +15,16 @@ impl CurrentStatus {
         }
     }
 
-    pub fn set_sink(&mut self, sink: Sink) {
+    fn set_sink(&mut self, sink: Sink) {
         self.sink = Some(sink);
     }
 
-    pub fn set_sink_empty(&mut self) {
+    fn set_sink_empty(&mut self) {
         self.sink = None;
+    }
+
+    fn set_song_name(&mut self, song_name: String) {
+        self.song_name = song_name;
     }
 
     pub fn set_playing(&mut self) {
@@ -29,10 +33,6 @@ impl CurrentStatus {
 
     pub fn set_stoped(&mut self) {
         self.stoped = true;
-    }
-
-    pub fn set_song_name(&mut self, song_name: String) {
-        self.song_name = song_name;
     }
 
     pub fn set_status_playing(&mut self, sink: Sink, song_name: String) {
